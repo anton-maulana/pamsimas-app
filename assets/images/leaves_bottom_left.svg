@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+
+  <!-- Leaf 1: largest, sweeping from bottom-left corner upward-right -->
+  <path d="M2,156 C20,140 62,118 98,80 C64,106 18,132 2,156 Z" fill="#66BB6A"/>
+  <path d="M2,156 C16,126 44,104 98,80"
+        stroke="#43A047" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Leaf 2: medium -->
+  <path d="M0,118 C20,116 68,96 92,44 C60,72 12,94 0,118 Z" fill="#4CAF50"/>
+  <path d="M0,118 C16,92 44,74 92,44"
+        stroke="#388E3C" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Leaf 3: smaller -->
+  <path d="M42,160 C55,152 88,136 108,102 C84,122 50,144 42,160 Z" fill="#A5D6A7"/>
+  <path d="M42,160 C52,136 72,122 108,102"
+        stroke="#66BB6A" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Water wave 1 -->
+  <path d="M0,143 Q22,132 44,143 Q66,154 88,143"
+        stroke="#90CAF9" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Water wave 2 -->
+  <path d="M4,154 Q26,145 48,154 Q70,163 92,154"
+        stroke="#B3E5FC" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Small water drops -->
+  <path d="M15,116 C15,116 10,127 10,132 C10,137 13,140 15,140 C17,140 20,137 20,132 C20,127 15,116 15,116 Z"
+        fill="#90CAF9" opacity="0.65"/>
+  <path d="M30,104 C30,104 26,114 26,118 C26,123 29,126 31,126 C33,126 36,123 36,118 C36,114 30,104 30,104 Z"
+        fill="#90CAF9" opacity="0.5"/>
+
+</svg>

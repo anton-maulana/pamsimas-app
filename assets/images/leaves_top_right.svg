@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+
+  <!-- Leaf 1: largest, sweeping from top-right corner downward-left -->
+  <path d="M158,4 C140,10 98,32 62,80 C96,54 142,28 158,4 Z" fill="#66BB6A"/>
+  <path d="M158,4 C144,34 116,56 62,80"
+        stroke="#43A047" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Leaf 2: medium, slightly lower -->
+  <path d="M160,42 C140,44 92,64 68,116 C100,88 148,66 160,42 Z" fill="#4CAF50"/>
+  <path d="M160,42 C144,68 116,86 68,116"
+        stroke="#388E3C" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Leaf 3: smaller, near top edge -->
+  <path d="M118,0 C105,8 72,24 52,58 C76,38 112,16 118,0 Z" fill="#A5D6A7"/>
+  <path d="M118,0 C108,24 88,38 52,58"
+        stroke="#66BB6A" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+</svg>

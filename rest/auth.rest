@@ -1,0 +1,19 @@
+### Variables
+@baseUrl = http://localhost:8000/api/v1
+@token = 
+
+
+### Login
+POST {{baseUrl}}/login
+Content-Type: application/x-www-form-urlencoded
+
+username=superadmin&password=Str1ngst!
+
+### Refresh Token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "refreshToken": "your_refresh_token_here"
+}

@@ -1,0 +1,42 @@
+### Variables
+@baseUrl = http://localhost:8000/api
+@token = your_access_token_here
+@customerId = 1
+
+### Get All Customers
+GET {{baseUrl}}/customers
+Authorization: Bearer {{token}}
+
+### Get Customer by ID
+GET {{baseUrl}}/customers/{{customerId}}
+Authorization: Bearer {{token}}
+
+### Create Customer
+POST {{baseUrl}}/customers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nama": "Budi Santoso",
+  "noHp": "08123456789",
+  "rtRw": "03/04",
+  "alamat": "Jl. Merpati No 10",
+  "petugas": "Adi Nugroho"
+}
+
+### Update Customer
+PUT {{baseUrl}}/customers/{{customerId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "nama": "Budi Santoso Updated",
+  "noHp": "08123456790",
+  "rtRw": "03/04",
+  "alamat": "Jl. Merpati No 11",
+  "petugas": "Adi Nugroho"
+}
+
+### Delete Customer
+DELETE {{baseUrl}}/customers/{{customerId}}
+Authorization: Bearer {{token}}
