@@ -25,6 +25,26 @@ enum UserRole {
 
 // ─── Petugas Model ────────────────────────────────────────────────────────────
 
+class OfficerArea {
+  final int? id;
+  final String rt;
+  final String rw;
+
+  const OfficerArea({this.id, required this.rt, required this.rw});
+
+  factory OfficerArea.fromJson(Map<String, dynamic> json) => OfficerArea(
+        id: json['id'] as int?,
+        rt: json['rt'] as String,
+        rw: json['rw'] as String,
+      );
+
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
+        'rt': rt,
+        'rw': rw,
+      };
+}
+
 /// Mirrors the backend `UserRead` schema, extended with a computed
 /// [customerCount] field populated from the customers endpoint.
 class PetugasModel {
@@ -36,6 +56,7 @@ class PetugasModel {
   final String? address;
   final UserRole role;
   final int customerCount;
+  final List<OfficerArea> areas;
 
   const PetugasModel({
     required this.id,
@@ -46,6 +67,7 @@ class PetugasModel {
     this.address,
     this.role = UserRole.officer,
     this.customerCount = 0,
+    this.areas = const [],
   });
 
   factory PetugasModel.fromJson(Map<String, dynamic> json) => PetugasModel(
@@ -56,6 +78,7 @@ class PetugasModel {
         phone: json['phone'] as String?,
         address: json['address'] as String?,
         role: UserRole.fromString(json['role'] as String?),
+        areas: (json['areas'] as List?)?.map((e) => OfficerArea.fromJson(e)).toList() ?? [],
       );
 
   PetugasModel copyWith({
@@ -66,6 +89,7 @@ class PetugasModel {
     String? address,
     UserRole? role,
     int? customerCount,
+    List<OfficerArea>? areas,
   }) {
     return PetugasModel(
       id: id,
@@ -76,6 +100,7 @@ class PetugasModel {
       address: address ?? this.address,
       role: role ?? this.role,
       customerCount: customerCount ?? this.customerCount,
+      areas: areas ?? this.areas,
     );
   }
 }
@@ -91,6 +116,7 @@ class PetugasCreateRequest {
   final String? phone;
   final String? address;
   final UserRole role;
+  final List<OfficerArea> areas;
 
   const PetugasCreateRequest({
     required this.name,
@@ -100,6 +126,7 @@ class PetugasCreateRequest {
     this.phone,
     this.address,
     this.role = UserRole.officer,
+    this.areas = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -110,6 +137,7 @@ class PetugasCreateRequest {
         'role': role.name,
         if (phone != null && phone!.isNotEmpty) 'phone': phone,
         if (address != null && address!.isNotEmpty) 'address': address,
+        'areas': areas.map((e) => e.toJson()).toList(),
       };
 }
 
@@ -122,6 +150,7 @@ class PetugasUpdateRequest {
   final String? phone;
   final String? address;
   final UserRole? role;
+  final List<OfficerArea>? areas;
 
   const PetugasUpdateRequest({
     this.name,
@@ -129,6 +158,7 @@ class PetugasUpdateRequest {
     this.phone,
     this.address,
     this.role,
+    this.areas,
   });
 
   Map<String, dynamic> toJson() => {
@@ -137,5 +167,6 @@ class PetugasUpdateRequest {
         if (phone != null) 'phone': phone,
         if (address != null) 'address': address,
         if (role != null) 'role': role!.name,
+        if (areas != null) 'areas': areas!.map((e) => e.toJson()).toList(),
       };
 }

@@ -18,9 +18,11 @@ class PetugasService {
   /// Fetches a paginated list of petugas.
   ///
   /// Returns raw list from `data` field of the paginated response.
-  Future<List<PetugasModel>> list({int page = 1, int itemsPerPage = 100}) async {
+  Future<List<PetugasModel>> list({int page = 1, int itemsPerPage = 100, String? rt, String? rw}) async {
     try {
-      final url = '/user/officers?page=$page&items_per_page=$itemsPerPage';
+      final url = '/user/officers?page=$page&items_per_page=$itemsPerPage' +
+          (rt != null ? '&rt=$rt' : '') +
+          (rw != null ? '&rw=$rw' : '');
       print('[PetugasService] GET $url');
 
       final response = await _dio.get<Map<String, dynamic>>(url);

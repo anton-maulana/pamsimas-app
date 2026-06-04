@@ -24,6 +24,8 @@ class CustomersService {
     String? status,
     int? officerId,
     String? meterNumber,
+    int? unbilledMonth,
+    int? unbilledYear,
     int page = 1,
     int itemsPerPage = 20,
   }) async {
@@ -38,6 +40,8 @@ class CustomersService {
         if (status != null && status != 'Semua') 'status': status.toUpperCase(),
         if (officerId != null) 'officer_id': officerId,
         if (meterNumber != null && meterNumber.isNotEmpty) 'meter_number': meterNumber,
+        if (unbilledMonth != null) 'unbilled_month': unbilledMonth,
+        if (unbilledYear != null) 'unbilled_year': unbilledYear,
       },
     );
     // Backend returns a plain JSON array

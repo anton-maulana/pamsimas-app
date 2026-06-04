@@ -73,4 +73,23 @@ class PaymentService {
       throw Exception('Gagal mencatat pembayaran kumulatif');
     }
   }
+
+  Future<double> getTotalIncome({int? month, int? year}) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/payments/stats/income',
+        queryParameters: {
+          if (month != null) 'month': month,
+          if (year != null) 'year': year,
+        },
+      );
+      return (response.data?['total_income'] as num?)?.toDouble() ?? 0.0;
+    } catch (e) {
+      if (e is DioException) {
+        final detail = e.response?.data?['detail'];
+        if (detail is String) throw Exception(detail);
+      }
+      throw Exception('Gagal memuat statistik pendapatan');
+    }
+  }
 }

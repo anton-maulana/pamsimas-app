@@ -31,9 +31,13 @@ class _TambahPelangganScreenState extends State<TambahPelangganScreen> {
   final _hpCtrl      = TextEditingController();
 
   // Dropdown values
+  String? _selectedRt;
+  String? _selectedRw;
   int? _selectedOfficerId;
   double? _lat;
   double? _lng;
+
+  final List<String> _range = List.generate(12, (i) => (i + 1).toString());
 
   bool _isSaving = false;
   bool _isLoadingOfficers = true;
@@ -81,8 +85,8 @@ class _TambahPelangganScreenState extends State<TambahPelangganScreen> {
     final p = widget.customer;
     if (p != null) {
       _namaCtrl.text   = p.name;
-      _rtCtrl.text     = p.rt;
-      _rwCtrl.text     = p.rw;
+      _selectedRt      = p.rt;
+      _selectedRw      = p.rw;
       _alamatCtrl.text = p.address;
       _hpCtrl.text     = p.phoneNumber;
       _selectedOfficerId = _officersMap.containsKey(p.officerId) ? p.officerId : null;
@@ -136,8 +140,8 @@ class _TambahPelangganScreenState extends State<TambahPelangganScreen> {
     try {
       final request = CustomerRequest(
         name:    _namaCtrl.text.trim(),
-        rt:      _rtCtrl.text.trim(),
-        rw:      _rwCtrl.text.trim(),
+        rt:      _selectedRt!,
+        rw:      _selectedRw!,
         address: _alamatCtrl.text.trim(),
         phoneNumber: _hpCtrl.text.trim(),
         officerId: _selectedOfficerId,
@@ -321,19 +325,18 @@ class _TambahPelangganScreenState extends State<TambahPelangganScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _buildRtField()),
+        Expanded(child: _buildRtDropdown()),
         const SizedBox(width: 12),
-        Expanded(child: _buildRwField()),
+        Expanded(child: _buildRwDropdown()),
       ],
     );
   }
 
-  Widget _buildRtField() {
+  Widget _buildRtDropdown() {
     return _fieldCard(
-      child: TextFormField(
-        controller: _rtCtrl,
-        keyboardType: TextInputType.number,
-        decoration: _inputDecor(hint: '01', icon: Icons.location_on_outlined).copyWith(
+      child: DropdownButtonFormField<String>(
+        value: _selectedRt,
+        decoration: _inputDecor(hint: 'Pilih RT', icon: Icons.location_on_outlined).copyWith(
           prefixIcon: null,
           prefixText: 'RT  ',
           prefixStyle: const TextStyle(
@@ -342,17 +345,18 @@ class _TambahPelangganScreenState extends State<TambahPelangganScreen> {
             fontSize: 14,
           ),
         ),
-        validator: (v) => (v == null || v.trim().isEmpty) ? 'RT wajib diisi' : null,
+        items: _range.map((val) => DropdownMenuItem(value: val, child: Text(val))).toList(),
+        onChanged: (v) => setState(() => _selectedRt = v),
+        validator: (v) => (v == null || v.isEmpty) ? 'Wajib' : null,
       ),
     );
   }
 
-  Widget _buildRwField() {
+  Widget _buildRwDropdown() {
     return _fieldCard(
-      child: TextFormField(
-        controller: _rwCtrl,
-        keyboardType: TextInputType.number,
-        decoration: _inputDecor(hint: '01', icon: Icons.location_city_outlined).copyWith(
+      child: DropdownButtonFormField<String>(
+        value: _selectedRw,
+        decoration: _inputDecor(hint: 'Pilih RW', icon: Icons.location_city_outlined).copyWith(
           prefixIcon: null,
           prefixText: 'RW  ',
           prefixStyle: const TextStyle(
@@ -361,7 +365,9 @@ class _TambahPelangganScreenState extends State<TambahPelangganScreen> {
             fontSize: 14,
           ),
         ),
-        validator: (v) => (v == null || v.trim().isEmpty) ? 'RW wajib diisi' : null,
+        items: _range.map((val) => DropdownMenuItem(value: val, child: Text(val))).toList(),
+        onChanged: (v) => setState(() => _selectedRw = v),
+        validator: (v) => (v == null || v.isEmpty) ? 'Wajib' : null,
       ),
     );
   }

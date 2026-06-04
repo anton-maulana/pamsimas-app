@@ -23,7 +23,8 @@ const int _tarifPerM3 = 3500;
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 class CatatMeterScreen extends StatefulWidget {
-  const CatatMeterScreen({Key? key}) : super(key: key);
+  final Customer? preselectedCustomer;
+  const CatatMeterScreen({Key? key, this.preselectedCustomer}) : super(key: key);
 
   @override
   State<CatatMeterScreen> createState() => _CatatMeterScreenState();
@@ -44,7 +45,6 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
   List<BillRead> _unpaidBills = [];
   double _totalTunggakan = 0.0;
   bool _isLoadingUnpaidBills = false;
-  
   bool _isLoading = false;
   bool _isLoadingOfficers = true;
   // ─── Officers state ───────────────────────────────────────────────────────
@@ -54,16 +54,73 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchOfficers();
+    if (widget.preselectedCustomer != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Refresh officers for this customer's area
+      _fetchOfficers(rt: widget.preselectedCustomer!.rt, rw: widget.preselectedCustomer!.rw);
+      _selectCustomerDirectly(widget.preselectedCustomer!);
+      });
+    } else {
+      _fetchOfficers();
+    }
   }
 
-  Future<void> _fetchOfficers() async {
+  Future<void> _selectCustomerDirectly(Customer picked) async {
+     setState(() {
+       _selected = picked;
+       _meterCtrl.clear();
+       _meterSaatIni = null;
+       _unpaidBills = [];
+       _totalTunggakan = 0.0;
+       _isLoadingUnpaidBills = true;
+       _amountDirectCtrl.text = _estimasiTagihan.toString();
+     });
+
+     // Refresh officers for this customer's area
+     _fetchOfficers(rt: picked.rt, rw: picked.rw);
+
+     try {
+        final customerId = int.parse(picked.id);
+        final bills = await BillService.instance.getBillsByCustomer(customerId);
+        final unpaid = bills.where((b) => b.status == 'unpaid' || b.status == 'partially_paid').toList();
+        
+        final unpaidWithRemaining = <BillRead>[];
+        double tunggakanAccumulator = 0.0;
+        for (final bill in unpaid) {
+           final payments = await PaymentService.instance.getPaymentsByBill(bill.id);
+           final totalPaid = payments.fold<double>(0, (sum, p) => sum + p.amountPaid);
+           final remaining = bill.amount - totalPaid;
+           if (remaining > 0) {
+              unpaidWithRemaining.add(bill);
+              tunggakanAccumulator += remaining;
+           }
+        }
+
+        if (mounted) {
+           setState(() {
+              _unpaidBills = unpaidWithRemaining;
+              _totalTunggakan = tunggakanAccumulator;
+              _isLoadingUnpaidBills = false;
+              _amountDirectCtrl.text = (_estimasiTagihan + _totalTunggakan).toInt().toString();
+           });
+        }
+     } catch (e) {
+        if (mounted) {
+           setState(() {
+              _isLoadingUnpaidBills = false;
+           });
+        }
+        _showSnack('Gagal memuat tunggakan pelanggan: $e');
+     }
+  }
+
+  Future<void> _fetchOfficers({String? rt, String? rw}) async {
     setState(() {
       _isLoadingOfficers = true;
       _officersError = null;
     });
     try {
-      final officers = await PetugasService.instance.list(page: 1, itemsPerPage: 100);
+      final officers = await PetugasService.instance.list(page: 1, itemsPerPage: 100, rt: rt, rw: rw);
       final newMap = <int, String>{};
       for (final off in officers) {
         newMap[off.id] = off.name;
@@ -72,6 +129,12 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
         setState(() {
           _officersMap = newMap;
           _isLoadingOfficers = false;
+          // Auto select if only one officer
+          if (newMap.length == 1) {
+            _selectedPetugas = newMap.keys.first;
+          } else {
+            _selectedPetugas = null;
+          }
         });
         _prefillData();
       }
@@ -866,7 +929,7 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
                           fontSize: 14, color: AppPalette.textDark)),
                 ))
             .toList(),
-        onChanged: isOfficer ? null : (v) => setState(() => _selectedPetugas = v),
+        onChanged: (v) => setState(() => _selectedPetugas = v),
         validator: (v) => v == null ? 'Petugas wajib dipilih' : null,
         disabledHint: _selectedPetugas != null && _officersMap.containsKey(_selectedPetugas)
             ? Text(_officersMap[_selectedPetugas]!, style: const TextStyle(fontSize: 14, color: AppPalette.textDark))
@@ -1120,6 +1183,9 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
           _isLoadingUnpaidBills = true;
           _amountDirectCtrl.text = _estimasiTagihan.toString();
         });
+
+        // Refresh officers for this customer's area
+        _fetchOfficers(rt: picked.rt, rw: picked.rw);
 
         try {
            final customerId = int.parse(picked.id);
@@ -1631,12 +1697,15 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
 
     setState(() => _loading = true);
     try {
+      final now = DateTime.now();
       final page = reset ? 1 : _page;
       final search = _searchCtrl.text.trim();
       final list = await CustomersService.instance.list(
         page: page,
         itemsPerPage: _pageSize,
         search: search.isNotEmpty ? search : null,
+        unbilledMonth: now.month,
+        unbilledYear: now.year,
       );
       if (!mounted) return;
       setState(() {

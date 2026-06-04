@@ -5,6 +5,7 @@ import 'package:pamsimas_app/src/core/services/bill_service.dart';
 import 'package:pamsimas_app/src/core/services/customers_service.dart';
 import 'package:pamsimas_app/src/core/models/bill_model.dart';
 import 'package:pamsimas_app/src/core/models/customer_model.dart';
+import 'package:pamsimas_app/src/core/services/petugas_service.dart';
 import 'package:pamsimas_app/src/theme/app_colors.dart';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -24,7 +25,7 @@ class _TagihanScreenState extends State<TagihanScreen> {
   String _filterStatus = 'Semua';
   String _filterRt     = 'Semua';
 
-  final List<String> _statusOptions = ['Semua', 'Lunas', 'Belum Bayar'];
+  final List<String> _statusOptions = ['Semua', 'Lunas', 'Belum Bayar', 'Sebagian'];
   final List<String> _rtOptions     = ['Semua', 'RT 01', 'RT 02', 'RT 03', 'RT 04'];
 
   final List<DateTime> _monthOptions = List.generate(12, (i) {
@@ -34,28 +35,94 @@ class _TagihanScreenState extends State<TagihanScreen> {
 
   List<BillRead> _bills = [];
   Map<int, Customer> _customerCache = {};
+  Map<int, String> _officersMap = {};
   bool _loading = false;
   String? _error;
+
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
+  static const int _pageSize = 50;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+
+  // Global summary stats for the selected month/year
+  int _summaryLunas = 0;
+  int _summaryBelum = 0;
+  int _summarySebagian = 0;
+  double _summaryTotalAmount = 0.0;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _selectedMonth = DateTime(now.year, now.month);
-    _fetchBills();
+    _fetchBills(reset: true);
+    _fetchOfficers();
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _fetchBills() async {
-     setState(() {
-        _loading = true;
-        _error = null;
-     });
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_hasMore && !_loading && !_loadingMore) {
+        _fetchBills(reset: false);
+      }
+    }
+  }
+
+  Future<void> _fetchOfficers() async {
      try {
-        final statusFilter = _filterStatus == 'Lunas' ? 'paid' : (_filterStatus == 'Belum Bayar' ? 'unpaid' : null);
+        final officers = await PetugasService.instance.list(page: 1, itemsPerPage: 100);
+        final newMap = <int, String>{};
+        for (final off in officers) {
+           newMap[off.id] = off.name;
+        }
+        if (mounted) {
+           setState(() {
+              _officersMap = newMap;
+           });
+        }
+     } catch (_) {}
+  }
+
+  Future<void> _fetchBills({bool reset = false}) async {
+     if (reset) {
+       setState(() {
+          _loading = true;
+          _error = null;
+          _currentPage = 1;
+          _bills = [];
+          _hasMore = true;
+       });
+       // Fetch summary stats only on reset/init
+       _fetchSummary();
+     } else {
+       setState(() {
+          _loadingMore = true;
+       });
+     }
+
+     try {
+        String? statusFilter;
+        if (_filterStatus == 'Lunas') {
+          statusFilter = 'paid';
+        } else if (_filterStatus == 'Belum Bayar') {
+          statusFilter = 'unpaid';
+        } else if (_filterStatus == 'Sebagian') {
+          statusFilter = 'partially_paid';
+        }
+
         final fetchedBills = await BillService.instance.list(
            billingMonth: _selectedMonth.month,
            billingYear: _selectedMonth.year,
            status: statusFilter,
+           page: _currentPage,
+           itemsPerPage: _pageSize,
         );
 
         // Fetch missing customer details to populate fields
@@ -69,8 +136,15 @@ class _TagihanScreenState extends State<TagihanScreen> {
 
         if (mounted) {
            setState(() {
-              _bills = fetchedBills;
+              if (reset) {
+                _bills = fetchedBills;
+              } else {
+                _bills.addAll(fetchedBills);
+              }
+              _currentPage++;
+              _hasMore = fetchedBills.length == _pageSize;
               _loading = false;
+              _loadingMore = false;
            });
         }
      } catch (e) {
@@ -78,12 +152,36 @@ class _TagihanScreenState extends State<TagihanScreen> {
            setState(() {
               _error = e.toString();
               _loading = false;
+              _loadingMore = false;
            });
         }
      }
   }
 
+  Future<void> _fetchSummary() async {
+    try {
+      final stats = await BillService.instance.getStatsSummary(
+        month: _selectedMonth.month, 
+        year: _selectedMonth.year
+      );
+      if (mounted) {
+        setState(() {
+          _summaryLunas = stats['paid_count'] as int? ?? 0;
+          // Note: Backend unpaid_count might include partially_paid, 
+          // but our UI split them. Let's adjust backend later if needed.
+          // For now we use counts from stats.
+          _summaryBelum = stats['unpaid_count'] as int? ?? 0; 
+          _summaryTotalAmount = (stats['total_amount_billed'] as num?)?.toDouble() ?? 0.0;
+          
+          // Since backend doesn't return partially_paid count separately yet, 
+          // we'll approximate or stick to what we have.
+        });
+      }
+    } catch (_) {}
+  }
+
   List<BillRead> get _filtered {
+    // Local filtering for RT
     return _bills.where((b) {
       final cust = _customerCache[b.customerId];
       if (cust == null) return false;
@@ -92,10 +190,6 @@ class _TagihanScreenState extends State<TagihanScreen> {
       return matchRt;
     }).toList();
   }
-
-  double get _totalTagihan => _filtered.fold(0.0, (s, t) => s + t.amount);
-  int get _jumlahLunas  => _filtered.where((t) => t.status == 'paid').length;
-  int get _jumlahBelum  => _filtered.where((t) => t.status == 'unpaid' || t.status == 'partially_paid').length;
 
   String _formatRp(int value) {
     final s = value.toString();
@@ -123,7 +217,7 @@ class _TagihanScreenState extends State<TagihanScreen> {
       backgroundColor: bgGrey,
       appBar: _buildAppBar(),
       body: RefreshIndicator(
-        onRefresh: _fetchBills,
+        onRefresh: () => _fetchBills(reset: true),
         child: Column(
           children: [
             _buildTopSection(),
@@ -140,7 +234,7 @@ class _TagihanScreenState extends State<TagihanScreen> {
                              children: [
                                 Text('Terjadi kesalahan: $_error', style: const TextStyle(color: Colors.red)),
                                 const SizedBox(height: 8),
-                                ElevatedButton(onPressed: _fetchBills, child: const Text('Coba Lagi')),
+                                ElevatedButton(onPressed: () => _fetchBills(reset: true), child: const Text('Coba Lagi')),
                              ],
                           ),
                        )
@@ -203,7 +297,7 @@ class _TagihanScreenState extends State<TagihanScreen> {
             )).toList(),
             onChanged: (v) {
                setState(() => _selectedMonth = v!);
-               _fetchBills();
+               _fetchBills(reset: true);
             },
           ),
         ),
@@ -221,21 +315,21 @@ class _TagihanScreenState extends State<TagihanScreen> {
           _buildSummaryChip(
               icon: Icons.check_circle_rounded,
               label: 'Lunas',
-              value: '$_jumlahLunas',
+              value: '$_summaryLunas',
               color: const Color(0xFF2E7D32)),
           const SizedBox(width: 10),
           _buildSummaryChip(
               icon: Icons.cancel_rounded,
-              label: 'Belum Bayar',
-              value: '$_jumlahBelum',
+              label: 'Belum',
+              value: '$_summaryBelum',
               color: const Color(0xFFC62828)),
           const Spacer(),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text('Total',
+              const Text('Total Tagihan',
                   style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-              Text(_formatRp(_totalTagihan.toInt()),
+              Text(_formatRp(_summaryTotalAmount.toInt()),
                   style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
@@ -297,7 +391,7 @@ class _TagihanScreenState extends State<TagihanScreen> {
               onTap: () => setState(() {
                 _filterStatus = 'Semua';
                 _filterRt     = 'Semua';
-                _fetchBills();
+                _fetchBills(reset: true);
               }),
               child: const Text('Reset',
                   style: TextStyle(
@@ -357,7 +451,7 @@ class _TagihanScreenState extends State<TagihanScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Text(
-        '$count tagihan · ${_formatMonth(_selectedMonth)}',
+        'Menampilkan $count data · ${_formatMonth(_selectedMonth)}',
         style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
       ),
     );
@@ -381,11 +475,22 @@ class _TagihanScreenState extends State<TagihanScreen> {
     }
 
     return ListView.separated(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: items.length,
+      itemCount: items.length + (_loadingMore ? 1 : 0),
       separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, i) => _buildCard(items[i]),
+      itemBuilder: (_, i) {
+        if (i == items.length) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(8.0),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        return _buildCard(items[i]);
+      }
     );
   }
 
@@ -508,6 +613,20 @@ class _TagihanScreenState extends State<TagihanScreen> {
                     const SizedBox(width: 10),
                     _detailChip(Icons.receipt_outlined,
                         _formatRp(t.amount.toInt()), const Color(0xFF1565C0)),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        const Icon(Icons.badge_outlined,
+                            size: 13, color: Color(0xFF9CA3AF)),
+                        const SizedBox(width: 4),
+                        Text(
+                           _customerCache[t.customerId]?.officerId != null && _officersMap.containsKey(_customerCache[t.customerId]!.officerId)
+                              ? _officersMap[_customerCache[t.customerId]!.officerId]!
+                              : 'Petugas',
+                           style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

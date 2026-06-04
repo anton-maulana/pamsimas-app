@@ -16,7 +16,7 @@ class MeterReadingService {
   Future<MeterReading> create(MeterReadingRequest request) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
-        '/meter_readings',
+        '/meter-readings',
         data: request.toJson(),
       );
       return MeterReading.fromJson(response.data!);

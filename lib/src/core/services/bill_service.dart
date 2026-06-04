@@ -78,4 +78,35 @@ class BillService {
       throw Exception('Gagal membuat tagihan');
     }
   }
+
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete<void>('/bills/$id');
+    } catch (e) {
+      if (e is DioException) {
+        final detail = e.response?.data?['detail'];
+        if (detail is String) throw Exception(detail);
+      }
+      throw Exception('Gagal membatalkan/menghapus tagihan');
+    }
+  }
+
+  Future<Map<String, dynamic>> getStatsSummary({int? month, int? year}) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/bills/stats/summary',
+        queryParameters: {
+          if (month != null) 'month': month,
+          if (year != null) 'year': year,
+        },
+      );
+      return response.data ?? {};
+    } catch (e) {
+      if (e is DioException) {
+        final detail = e.response?.data?['detail'];
+        if (detail is String) throw Exception(detail);
+      }
+      throw Exception('Gagal memuat stats tagihan');
+    }
+  }
 }

@@ -4,34 +4,94 @@ import 'package:pamsimas_app/src/pages/laporan/laporan_screen.dart';
 import 'package:pamsimas_app/src/pages/meter/catat_meter_screen.dart';
 import 'package:pamsimas_app/src/pages/petugas/petugas_screen.dart';
 import 'package:pamsimas_app/src/pages/tagihan/tagihan_screen.dart';
+import 'package:pamsimas_app/src/core/services/bill_service.dart';
+import 'package:pamsimas_app/src/core/services/payment_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   static const Color primaryBlue = Color(0xFF1565C0);
   static const Color lightBlue = Color(0xFF42A5F5);
   static const Color bgGrey = Color(0xFFF2F4F7);
   static const Color cardWhite = Colors.white;
+
+  int _totalCustomers = 0;
+  int _unbilledCount = 0;
+  int _unpaidCount = 0;
+  int _paidCount = 0;
+  double _totalIncome = 0.0;
+  double _totalAmountBilled = 0.0;
+  double _totalAmountCollected = 0.0;
+  bool _loadingStats = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStats();
+  }
+
+  Future<void> _fetchStats() async {
+    try {
+      final now = DateTime.now();
+      final stats = await BillService.instance.getStatsSummary(month: now.month, year: now.year);
+      final income = await PaymentService.instance.getTotalIncome(month: now.month, year: now.year);
+      if (mounted) {
+        setState(() {
+          _totalCustomers = stats['total_customers'] as int? ?? 0;
+          _unbilledCount = stats['unbilled_count'] as int? ?? 0;
+          _unpaidCount = stats['unpaid_count'] as int? ?? 0;
+          _paidCount = stats['paid_count'] as int? ?? 0;
+          _totalAmountBilled = (stats['total_amount_billed'] as num?)?.toDouble() ?? 0.0;
+          _totalAmountCollected = (stats['total_amount_collected'] as num?)?.toDouble() ?? 0.0;
+          _totalIncome = income;
+          _loadingStats = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingStats = false);
+      }
+    }
+  }
+
+  String _formatRp(int value) {
+    final s = value.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buffer.write('.');
+      buffer.write(s[i]);
+    }
+    return 'Rp ${buffer.toString()}';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgGrey,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 24),
-              _buildSummaryCard(),
-              const SizedBox(height: 28),
-              _buildMenuGrid(context),
-              const SizedBox(height: 28),
-              _buildInfoSection(),
-              const SizedBox(height: 16),
-            ],
+        child: RefreshIndicator(
+          onRefresh: _fetchStats,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 24),
+                _buildSummaryCard(),
+                const SizedBox(height: 28),
+                _buildMenuGrid(context),
+                const SizedBox(height: 28),
+                _buildInfoSection(),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
@@ -75,6 +135,11 @@ class HomeScreen extends StatelessWidget {
 
   // ─── Summary Card ──────────────────────────────────────────────────────────
   Widget _buildSummaryCard() {
+    double lunasPercent = 0.0;
+    if (_totalAmountBilled > 0) {
+       lunasPercent = (_totalAmountCollected / _totalAmountBilled) * 100;
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -95,9 +160,9 @@ class HomeScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(child: _buildSummaryItem(Icons.payments_outlined, 'Pembayaran', '75% Lunas')),
+          Expanded(child: _buildSummaryItem(Icons.payments_outlined, 'Penagihan', _loadingStats ? '...' : '${lunasPercent.toStringAsFixed(0)}% Masuk')),
           Container(width: 1, height: 60, color: Colors.white.withOpacity(0.4)),
-          Expanded(child: _buildSummaryItem(Icons.account_balance_wallet_outlined, 'Pendapatan', 'Rp 5.000.000')),
+          Expanded(child: _buildSummaryItem(Icons.account_balance_wallet_outlined, 'Uang Masuk', _loadingStats ? '...' : _formatRp(_totalIncome.toInt()))),
         ],
       ),
     );
@@ -218,33 +283,36 @@ class HomeScreen extends StatelessWidget {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const PelangganScreen()),
-      );
+      ).then((_) => _fetchStats());
     } else if (label == 'Catat Meter') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const CatatMeterScreen()),
-      );
+      ).then((_) => _fetchStats());
     } else if (label == 'Tagihan') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TagihanScreen()),
-      );
+      ).then((_) => _fetchStats());
     } else if (label == 'Laporan') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const LaporanScreen()),
-      );
+      ).then((_) => _fetchStats());
     } else if (label == 'Petugas') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const PetugasScreen()),
-      );
+      ).then((_) => _fetchStats());
     }
-    // TODO: Add navigation for other menu items
   }
 
   // ─── Info Section ──────────────────────────────────────────────────────────
   Widget _buildInfoSection() {
+    final now = DateTime.now();
+    const months = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -261,26 +329,39 @@ class HomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Status Pembayaran',
-            style: TextStyle(
+          Text(
+            'Progres Pencatatan (${months[now.month]} ${now.year})',
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               color: Color(0xFF1A1A2E),
             ),
           ),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.cancel_outlined, 'Belum bayar', '35 pelanggan', const Color(0xFFC62828)),
+          _buildInfoRow(
+            Icons.pending_actions_outlined, 
+            'Belum Dicatat Meter', 
+            _loadingStats ? '...' : '$_unbilledCount pelanggan', 
+            const Color(0xFFE65100),
+            onTap: () {
+               Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PelangganScreen(filterUnbilledOnly: true)),
+               ).then((_) => _fetchStats());
+            }
+          ),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.check_circle_outline, 'Sudah bayar', '85 pelanggan', const Color(0xFF2E7D32)),
+          _buildInfoRow(Icons.cancel_outlined, 'Belum Lunas / Bayar Sebagian', _loadingStats ? '...' : '$_unpaidCount pelanggan', const Color(0xFFC62828)),
+          const SizedBox(height: 12),
+          _buildInfoRow(Icons.check_circle_outline, 'Lunas Bulan Ini', _loadingStats ? '...' : '$_paidCount pelanggan', const Color(0xFF2E7D32)),
           const SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: 85 / (85 + 35),
+              value: _totalCustomers > 0 ? (_totalCustomers - _unbilledCount) / _totalCustomers : 0,
               minHeight: 8,
-              backgroundColor: const Color(0xFFFEE2E2),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
+              backgroundColor: const Color(0xFFF3F4F6),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00897B)),
             ),
           ),
         ],
@@ -288,25 +369,36 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, Color color) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: 12),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+  Widget _buildInfoRow(IconData icon, String label, String value, Color color, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+            ),
+            const Spacer(),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            if (onTap != null) ...[
+               const SizedBox(width: 4),
+               Icon(Icons.chevron_right, size: 16, color: color),
+            ]
+          ],
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

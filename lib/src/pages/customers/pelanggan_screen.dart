@@ -7,11 +7,13 @@ import 'package:pamsimas_app/src/pages/customers/pelanggan_card.dart';
 import 'package:pamsimas_app/src/pages/customers/pelanggan_detail_screen.dart';
 import 'package:pamsimas_app/src/pages/customers/pelanggan_filter_sheet.dart';
 import 'package:pamsimas_app/src/pages/customers/tambah_pelanggan_screen.dart';
+import 'package:pamsimas_app/src/pages/meter/catat_meter_screen.dart';
 import 'package:pamsimas_app/src/theme/app_colors.dart';
 
 
 class PelangganScreen extends StatefulWidget {
-  const PelangganScreen({super.key});
+  final bool filterUnbilledOnly;
+  const PelangganScreen({super.key, this.filterUnbilledOnly = false});
 
   @override
   State<PelangganScreen> createState() => _PelangganScreenState();
@@ -24,6 +26,7 @@ class _PelangganScreenState extends State<PelangganScreen> {
   String _filterRt     = 'Semua';
   String _filterRw     = 'Semua';
   String _filterStatus = 'Semua';
+  late bool _showUnbilledOnly;
 
   List<Customer> _pelangganList = [];
   bool            _isLoading     = false;
@@ -40,6 +43,7 @@ class _PelangganScreenState extends State<PelangganScreen> {
   @override
   void initState() {
     super.initState();
+    _showUnbilledOnly = widget.filterUnbilledOnly;
     _loadPelanggan();
   }
 
@@ -56,7 +60,12 @@ class _PelangganScreenState extends State<PelangganScreen> {
       _errorMessage = null;
     });
     try {
-      final data = await CustomersService.instance.list(itemsPerPage: 500);
+      final now = DateTime.now();
+      final data = await CustomersService.instance.list(
+        unbilledMonth: _showUnbilledOnly ? now.month : null,
+        unbilledYear: _showUnbilledOnly ? now.year : null,
+        itemsPerPage: 500,
+      );
       if (!mounted) return;
       setState(() {
         _pelangganList = data;
@@ -96,11 +105,20 @@ class _PelangganScreenState extends State<PelangganScreen> {
 
 
   Future<void> _openDetail(Customer p) async {
-    final refresh = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => PelangganDetailScreen(customer: p)),
-    );
-    if (refresh == true) _loadPelanggan();
+    if (_showUnbilledOnly) {
+       // Navigate directly to Catat Meter page with pre-selected customer
+       final refresh = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => CatatMeterScreen(preselectedCustomer: p)),
+       );
+       if (refresh == true) _loadPelanggan();
+    } else {
+       final refresh = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => PelangganDetailScreen(customer: p)),
+       );
+       if (refresh == true) _loadPelanggan();
+    }
   }
 
   void _openFilter() {
@@ -211,32 +229,34 @@ class _PelangganScreenState extends State<PelangganScreen> {
             active: _filterRt != 'Semua',
             onTap: _openFilter,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           FilterButton(
             label: _filterRw == 'Semua' ? 'RW' : _filterRw,
             icon: Icons.location_city_outlined,
             active: _filterRw != 'Semua',
             onTap: _openFilter,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           FilterButton(
-            label: _filterStatus == 'Semua' ? 'Status' : _filterStatus,
-            icon: Icons.circle,
-            active: _filterStatus != 'Semua',
-            iconColor: _filterStatus == 'Menunggak'
-                ? AppPalette.errorRed
-                : _filterStatus == 'Aktif'
-                    ? AppPalette.successGreen
-                    : null,
-            onTap: _openFilter,
+            label: _showUnbilledOnly ? 'Belum Dicatat' : 'Semua',
+            icon: Icons.pending_actions_outlined,
+            active: _showUnbilledOnly,
+            onTap: () {
+               setState(() {
+                  _showUnbilledOnly = !_showUnbilledOnly;
+               });
+               _loadPelanggan();
+            },
           ),
           const Spacer(),
-          if (_filterRt != 'Semua' || _filterRw != 'Semua' || _filterStatus != 'Semua')
+          if (_filterRt != 'Semua' || _filterRw != 'Semua' || _filterStatus != 'Semua' || _showUnbilledOnly)
             GestureDetector(
               onTap: () => setState(() {
                 _filterRt     = 'Semua';
                 _filterRw     = 'Semua';
                 _filterStatus = 'Semua';
+                _showUnbilledOnly = false;
+                _loadPelanggan();
               }),
               child: const Text(
                 'Reset',

@@ -30,6 +30,7 @@ class _TambahPetugasScreenState extends State<TambahPetugasScreen> {
   bool _isSubmitting = false;
   bool _obscurePassword = true;
   UserRole _selectedRole = UserRole.officer;
+  List<OfficerArea> _areas = [];
 
   bool get _isEdit => widget.existing != null;
 
@@ -44,6 +45,7 @@ class _TambahPetugasScreenState extends State<TambahPetugasScreen> {
       _phoneCtrl.text = p.phone ?? '';
       _addressCtrl.text = p.address ?? '';
       _selectedRole = p.role;
+      _areas = List.from(p.areas);
     }
   }
 
@@ -119,6 +121,7 @@ class _TambahPetugasScreenState extends State<TambahPetugasScreen> {
             phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
             address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
             role: _selectedRole,
+            areas: _areas,
           ),
         );
       } else {
@@ -131,6 +134,7 @@ class _TambahPetugasScreenState extends State<TambahPetugasScreen> {
             phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
             address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
             role: _selectedRole,
+            areas: _areas,
           ),
         );
       }
@@ -148,6 +152,71 @@ class _TambahPetugasScreenState extends State<TambahPetugasScreen> {
   }
 
   void _onBatal() => Navigator.pop(context);
+
+  void _addArea() {
+    String? selectedRt;
+    String? selectedRw;
+    final List<String> range = List.generate(12, (i) => (i + 1).toString());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Tambah Wilayah Tugas',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: selectedRt,
+                decoration: const InputDecoration(
+                  labelText: 'RT',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+                items: range
+                    .map((val) => DropdownMenuItem(value: val, child: Text(val)))
+                    .toList(),
+                onChanged: (v) => setDialogState(() => selectedRt = v),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedRw,
+                decoration: const InputDecoration(
+                  labelText: 'RW',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.map_outlined),
+                ),
+                items: range
+                    .map((val) => DropdownMenuItem(value: val, child: Text(val)))
+                    .toList(),
+                onChanged: (v) => setDialogState(() => selectedRw = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Batal', style: TextStyle(color: Colors.grey))),
+            ElevatedButton(
+              onPressed: () {
+                if (selectedRt != null && selectedRw != null) {
+                  setState(() {
+                    _areas.add(OfficerArea(rt: selectedRt!, rw: selectedRw!));
+                  });
+                  Navigator.pop(ctx);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryBlue, foregroundColor: Colors.white),
+              child: const Text('Tambah'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _showResetPasswordDialog() async {
     final passwordCtrl = TextEditingController();
@@ -297,6 +366,10 @@ class _TambahPetugasScreenState extends State<TambahPetugasScreen> {
               _buildPhoneField(),
               const SizedBox(height: 16),
               _buildAddressField(),
+              const SizedBox(height: 24),
+              _sectionLabel('Wilayah Tugas (RT/RW)'),
+              const SizedBox(height: 12),
+              _buildAreasSection(),
               if (_isEdit) ...[const SizedBox(height: 24), _buildResetPasswordButton()],
               const SizedBox(height: 36),
               _buildSimpanButton(),
@@ -304,6 +377,42 @@ class _TambahPetugasScreenState extends State<TambahPetugasScreen> {
               _buildBatalButton(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAreasSection() {
+    return _fieldCard(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          children: [
+            if (_areas.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text('Belum ada wilayah tugas yang diset', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              ),
+            Wrap(
+              spacing: 8,
+              children: _areas.map((area) => Chip(
+                label: Text('RT ${area.rt} / RW ${area.rw}', style: const TextStyle(fontSize: 12)),
+                onDeleted: () {
+                  setState(() {
+                    _areas.remove(area);
+                  });
+                },
+                backgroundColor: primaryBlue.withOpacity(0.1),
+                deleteIconColor: Colors.red,
+              )).toList(),
+            ),
+            const Divider(),
+            TextButton.icon(
+              onPressed: _addArea,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Tambah Wilayah'),
+            ),
+          ],
         ),
       ),
     );
