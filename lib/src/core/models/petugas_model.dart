@@ -27,15 +27,15 @@ enum UserRole {
 
 class OfficerArea {
   final int? id;
-  final String rt;
-  final String rw;
+  final int rt;
+  final int rw;
 
   const OfficerArea({this.id, required this.rt, required this.rw});
 
   factory OfficerArea.fromJson(Map<String, dynamic> json) => OfficerArea(
         id: json['id'] as int?,
-        rt: json['rt'] as String,
-        rw: json['rw'] as String,
+        rt: json['rt'] as int,
+        rw: json['rw'] as int,
       );
 
   Map<String, dynamic> toJson() => {

@@ -87,9 +87,28 @@ class AuthService {
   void _decodeAndCacheToken(String token) {
     try {
       _decodedToken = JwtDecoder.decode(token);
+      print('[AuthService] Decoded Token: $_decodedToken');
     } catch (e) {
       print('[AuthService] Error decoding token: $e');
       _decodedToken = null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCurrentUserFromServer() async {
+    try {
+      final token = await getAccessToken();
+      if (token == null) return null;
+      
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/user/me',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      
+      // Update local profile data if needed
+      return response.data;
+    } catch (e) {
+      print('[AuthService] Error fetching profile: $e');
+      return _decodedToken; // Fallback to token data
     }
   }
 

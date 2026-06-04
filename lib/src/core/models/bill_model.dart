@@ -4,9 +4,9 @@ class BillCreate {
   final int customerId;
   final int billingMonth;
   final int billingYear;
-  final int meterStart;
-  final int meterEnd;
-  final int usage;
+  final double meterStart;
+  final double meterEnd;
+  final double usage;
   final double amount;
   final String status;
   final String? notes;
@@ -41,9 +41,9 @@ class BillRead {
   final int customerId;
   final int billingMonth;
   final int billingYear;
-  final int meterStart;
-  final int meterEnd;
-  final int usage;
+  final double meterStart;
+  final double meterEnd;
+  final double usage;
   final double amount;
   final String status;
   final String? notes;
@@ -68,9 +68,9 @@ class BillRead {
         customerId: json['customer_id'] as int,
         billingMonth: json['billing_month'] as int,
         billingYear: json['billing_year'] as int,
-        meterStart: json['meter_start'] as int,
-        meterEnd: json['meter_end'] as int,
-        usage: json['usage'] as int,
+        meterStart: (json['meter_start'] as num).toDouble(),
+        meterEnd: (json['meter_end'] as num).toDouble(),
+        usage: (json['usage'] as num).toDouble(),
         amount: (json['amount'] as num).toDouble(),
         status: json['status'] as String,
         notes: json['notes'] as String?,

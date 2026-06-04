@@ -154,7 +154,7 @@ class _PelangganDetailScreenState extends State<PelangganDetailScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    widget.customer.meterNumber,
+                    'Meter ID: ${widget.customer.meterNumber}',
                     style: const TextStyle(fontSize: 13, color: AppPalette.textGreyLight),
                   ),
                   const SizedBox(height: 12),
@@ -180,8 +180,8 @@ class _PelangganDetailScreenState extends State<PelangganDetailScreen> {
             // Info rows
             _InfoCard(
               rows: [
-                _InfoRow(icon: Icons.location_on_outlined, label: 'RT',     value: widget.customer.rt),
-                _InfoRow(icon: Icons.location_city_outlined, label: 'RW',    value: widget.customer.rw),
+                _InfoRow(icon: Icons.location_on_outlined, label: 'RT',     value: widget.customer.rt.toString()),
+                _InfoRow(icon: Icons.location_city_outlined, label: 'RW',    value: widget.customer.rw.toString()),
                 _InfoRow(icon: Icons.home_outlined,         label: 'Alamat',  value: widget.customer.address),
                 if (widget.customer.phoneNumber.isNotEmpty)
                   _InfoRow(icon: Icons.phone_outlined,      label: 'No. HP',  value: widget.customer.phoneNumber),

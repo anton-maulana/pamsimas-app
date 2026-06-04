@@ -8,9 +8,9 @@ class TagihanItem {
   final String rt;
   final String rw;
   final String alamat;
-  final int meterSebelumnya;
-  final int meterSaatIni;
-  final int pemakaian;
+  final double meterSebelumnya;
+  final double meterSaatIni;
+  final double pemakaian;
   final int tarif;
   final int totalTagihan;
   final StatusTagihan status;

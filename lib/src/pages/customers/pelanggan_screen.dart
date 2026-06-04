@@ -21,22 +21,29 @@ class PelangganScreen extends StatefulWidget {
 
 class _PelangganScreenState extends State<PelangganScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
 
   String _searchQuery  = '';
-  String _filterRt     = 'Semua';
-  String _filterRw     = 'Semua';
+  List<String> _selectedRts = [];
+  List<String> _selectedRws = [];
   String _filterStatus = 'Semua';
   late bool _showUnbilledOnly;
 
   List<Customer> _pelangganList = [];
   bool            _isLoading     = false;
+  bool            _isLoadingMore = false;
+  bool            _hasMore       = true;
+  int             _currentPage   = 1;
+  static const int _pageSize     = 20;
   String?         _errorMessage;
 
   final List<String> _rtOptions = [
-    'Semua', 'RT 01', 'RT 02', 'RT 03', 'RT 04',
+    'Semua',
+    ...List.generate(12, (i) => 'RT ${(i + 1).toString().padLeft(2, '0')}')
   ];
   final List<String> _rwOptions = [
-    'Semua', 'RW 01', 'RW 02', 'RW 03',
+    'Semua',
+    ...List.generate(12, (i) => 'RW ${(i + 1).toString().padLeft(2, '0')}')
   ];
   final List<String> _statusOptions = ['Semua', 'Aktif', 'Menunggak'];
 
@@ -44,103 +51,106 @@ class _PelangganScreenState extends State<PelangganScreen> {
   void initState() {
     super.initState();
     _showUnbilledOnly = widget.filterUnbilledOnly;
-    _loadPelanggan();
+    _loadPelanggan(reset: true);
+    _scrollCtrl.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
-
-  Future<void> _loadPelanggan() async {
-    setState(() {
-      _isLoading    = true;
-      _errorMessage = null;
-    });
-    try {
-      final now = DateTime.now();
-      final data = await CustomersService.instance.list(
-        unbilledMonth: _showUnbilledOnly ? now.month : null,
-        unbilledYear: _showUnbilledOnly ? now.year : null,
-        itemsPerPage: 500,
-      );
-      if (!mounted) return;
-      setState(() {
-        _pelangganList = data;
-        _isLoading     = false;
-      });
-    } on DioException catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading    = false;
-        _errorMessage = 'Gagal memuat data.\nPeriksa koneksi internet.';
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading    = false;
-        _errorMessage = 'Terjadi kesalahan.\nSilakan coba lagi.';
-      });
+  void _onScroll() {
+    if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 200) {
+      if (_hasMore && !_isLoading && !_isLoadingMore) {
+        _loadPelanggan(reset: false);
+      }
     }
   }
 
-  List<Customer> get _filtered {
-    return _pelangganList.where((p) {
-      final q           = _searchQuery.toLowerCase();
-      final matchSearch = q.isEmpty ||
-          p.name.toLowerCase().contains(q) ||
-          p.meterNumber.toLowerCase().contains(q) ||
-          p.rt.toLowerCase().contains(q) ||
-          p.rw.toLowerCase().contains(q);
-      final matchRt     = _filterRt == 'Semua'    || 'RT ${p.rt}' == _filterRt;
-      final matchRw     = _filterRw == 'Semua'    || 'RW ${p.rw}' == _filterRw;
-      final matchStatus = _filterStatus == 'Semua'  ||
-          (_filterStatus == 'Aktif'     && p.status.toLowerCase() == 'aktif') ||
-          (_filterStatus == 'Menunggak' && p.status.toLowerCase() == 'menunggak');
-      return matchSearch && matchRt && matchRw && matchStatus;
-    }).toList();
-  }
-
-
-  Future<void> _openDetail(Customer p) async {
-    if (_showUnbilledOnly) {
-       // Navigate directly to Catat Meter page with pre-selected customer
-       final refresh = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(builder: (_) => CatatMeterScreen(preselectedCustomer: p)),
-       );
-       if (refresh == true) _loadPelanggan();
+  Future<void> _loadPelanggan({bool reset = false}) async {
+    if (reset) {
+      setState(() {
+        _isLoading = true;
+        _currentPage = 1;
+        _pelangganList = [];
+        _hasMore = true;
+        _errorMessage = null;
+      });
     } else {
-       final refresh = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(builder: (_) => PelangganDetailScreen(customer: p)),
-       );
-       if (refresh == true) _loadPelanggan();
+      setState(() {
+        _isLoadingMore = true;
+      });
+    }
+
+    try {
+      final now = DateTime.now();
+      
+      final rtList = _selectedRts.map((s) => int.parse(s.replaceFirst('RT ', ''))).join(',');
+      final rwList = _selectedRws.map((s) => int.parse(s.replaceFirst('RW ', ''))).join(',');
+
+      final data = await CustomersService.instance.list(
+        page: _currentPage,
+        itemsPerPage: _pageSize,
+        search: _searchQuery.isEmpty ? null : _searchQuery,
+        rt: rtList.isEmpty ? null : rtList,
+        rw: rwList.isEmpty ? null : rwList,
+        status: _filterStatus == 'Semua' ? null : _filterStatus.toUpperCase(),
+        unbilledMonth: _showUnbilledOnly ? now.month : null,
+        unbilledYear: _showUnbilledOnly ? now.year : null,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        if (reset) {
+          _pelangganList = data;
+        } else {
+          _pelangganList.addAll(data);
+        }
+        _isLoading = false;
+        _isLoadingMore = false;
+        _currentPage++;
+        _hasMore = data.length == _pageSize;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+        _errorMessage = 'Gagal memuat data: ${e.message}';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+        _errorMessage = 'Terjadi kesalahan: $e';
+      });
     }
   }
 
   void _openFilter() {
     showPelangganFilterSheet(
       context: context,
-      filterRt: _filterRt,
-      filterRw: _filterRw,
+      selectedRts: _selectedRts,
+      selectedRws: _selectedRws,
       filterStatus: _filterStatus,
       rtOptions: _rtOptions,
       rwOptions: _rwOptions,
       statusOptions: _statusOptions,
-      onRtChanged: (v) => setState(() => _filterRt = v),
-      onRwChanged: (v) => setState(() => _filterRw = v),
+      onRtsChanged: (v) => setState(() => _selectedRts = v),
+      onRwsChanged: (v) => setState(() => _selectedRws = v),
       onStatusChanged: (v) => setState(() => _filterStatus = v),
-    );
+    ).then((_) {
+      _loadPelanggan(reset: true);
+    });
   }
 
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
-
     return Scaffold(
       backgroundColor: AppPalette.bgGrey,
       appBar: _buildAppBar(),
@@ -148,13 +158,13 @@ class _PelangganScreenState extends State<PelangganScreen> {
         children: [
           _buildSearchBar(),
           _buildFilterRow(),
-          _buildResultCount(filtered.length),
+          _buildResultCount(_pelangganList.length),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppPalette.primaryBlue))
                 : _errorMessage != null
                     ? _buildErrorState()
-                    : _buildList(filtered),
+                    : _buildList(_pelangganList),
           ),
         ],
       ),
@@ -189,7 +199,10 @@ class _PelangganScreenState extends State<PelangganScreen> {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: TextField(
         controller: _searchCtrl,
-        onChanged: (v) => setState(() => _searchQuery = v),
+        onSubmitted: (v) {
+          setState(() => _searchQuery = v);
+          _loadPelanggan(reset: true);
+        },
         style: const TextStyle(fontSize: 15),
         decoration: InputDecoration(
           hintText: 'Cari nama, ID, atau RT/RW...',
@@ -201,6 +214,7 @@ class _PelangganScreenState extends State<PelangganScreen> {
                   onPressed: () {
                     _searchCtrl.clear();
                     setState(() => _searchQuery = '');
+                    _loadPelanggan(reset: true);
                   },
                 )
               : null,
@@ -224,16 +238,16 @@ class _PelangganScreenState extends State<PelangganScreen> {
       child: Row(
         children: [
           FilterButton(
-            label: _filterRt == 'Semua' ? 'RT' : _filterRt,
+            label: _selectedRts.isEmpty ? 'RT' : '${_selectedRts.length} RT',
             icon: Icons.location_on_outlined,
-            active: _filterRt != 'Semua',
+            active: _selectedRts.isNotEmpty,
             onTap: _openFilter,
           ),
           const SizedBox(width: 8),
           FilterButton(
-            label: _filterRw == 'Semua' ? 'RW' : _filterRw,
+            label: _selectedRws.isEmpty ? 'RW' : '${_selectedRws.length} RW',
             icon: Icons.location_city_outlined,
-            active: _filterRw != 'Semua',
+            active: _selectedRws.isNotEmpty,
             onTap: _openFilter,
           ),
           const SizedBox(width: 8),
@@ -245,18 +259,18 @@ class _PelangganScreenState extends State<PelangganScreen> {
                setState(() {
                   _showUnbilledOnly = !_showUnbilledOnly;
                });
-               _loadPelanggan();
+               _loadPelanggan(reset: true);
             },
           ),
           const Spacer(),
-          if (_filterRt != 'Semua' || _filterRw != 'Semua' || _filterStatus != 'Semua' || _showUnbilledOnly)
+          if (_selectedRts.isNotEmpty || _selectedRws.isNotEmpty || _filterStatus != 'Semua' || _showUnbilledOnly)
             GestureDetector(
               onTap: () => setState(() {
-                _filterRt     = 'Semua';
-                _filterRw     = 'Semua';
+                _selectedRts  = [];
+                _selectedRws  = [];
                 _filterStatus = 'Semua';
                 _showUnbilledOnly = false;
-                _loadPelanggan();
+                _loadPelanggan(reset: true);
               }),
               child: const Text(
                 'Reset',
@@ -301,7 +315,7 @@ class _PelangganScreenState extends State<PelangganScreen> {
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
-            onPressed: _loadPelanggan,
+            onPressed: () => _loadPelanggan(reset: true),
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text('Coba Lagi'),
             style: ElevatedButton.styleFrom(
@@ -316,7 +330,7 @@ class _PelangganScreenState extends State<PelangganScreen> {
 
 
   Widget _buildList(List<Customer> items) {
-    if (items.isEmpty) {
+    if (items.isEmpty && !_isLoading) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -334,13 +348,24 @@ class _PelangganScreenState extends State<PelangganScreen> {
     }
 
     return ListView.separated(
+      controller: _scrollCtrl,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-      itemCount: items.length,
+      itemCount: items.length + (_isLoadingMore ? 1 : 0),
       separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, i) => PelangganCard(
-        customer: items[i],
-        onTap: () => _openDetail(items[i]),
-      ),
+      itemBuilder: (_, i) {
+        if (i == items.length) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+        return PelangganCard(
+          customer: items[i],
+          onTap: () => _openDetail(items[i]),
+        );
+      },
     );
   }
 
@@ -352,12 +377,28 @@ class _PelangganScreenState extends State<PelangganScreen> {
           context,
           MaterialPageRoute(builder: (_) => const TambahPelangganScreen()),
         );
-        if (refresh == true) _loadPelanggan();
+        if (refresh == true) _loadPelanggan(reset: true);
       },
       backgroundColor: AppPalette.primaryBlue,
       foregroundColor: Colors.white,
       elevation: 4,
       child: const Icon(Icons.person_add_rounded, size: 28),
     );
+  }
+
+  Future<void> _openDetail(Customer p) async {
+    if (_showUnbilledOnly) {
+       final refresh = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => CatatMeterScreen(preselectedCustomer: p)),
+       );
+       if (refresh == true) _loadPelanggan(reset: true);
+    } else {
+       final refresh = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => PelangganDetailScreen(customer: p)),
+       );
+       if (refresh == true) _loadPelanggan(reset: true);
+    }
   }
 }

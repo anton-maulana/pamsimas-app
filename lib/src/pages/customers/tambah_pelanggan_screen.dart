@@ -85,8 +85,8 @@ class _TambahPelangganScreenState extends State<TambahPelangganScreen> {
     final p = widget.customer;
     if (p != null) {
       _namaCtrl.text   = p.name;
-      _selectedRt      = p.rt;
-      _selectedRw      = p.rw;
+      _selectedRt      = p.rt.toString();
+      _selectedRw      = p.rw.toString();
       _alamatCtrl.text = p.address;
       _hpCtrl.text     = p.phoneNumber;
       _selectedOfficerId = _officersMap.containsKey(p.officerId) ? p.officerId : null;
@@ -140,13 +140,13 @@ class _TambahPelangganScreenState extends State<TambahPelangganScreen> {
     try {
       final request = CustomerRequest(
         name:    _namaCtrl.text.trim(),
-        rt:      _selectedRt!,
-        rw:      _selectedRw!,
+        rt:      int.parse(_selectedRt!),
+        rw:      int.parse(_selectedRw!),
         address: _alamatCtrl.text.trim(),
         phoneNumber: _hpCtrl.text.trim(),
         officerId: _selectedOfficerId,
         status:  'ACTIVE',
-        meterNumber: widget.customer?.meterNumber ?? 'MTR-${DateTime.now().millisecondsSinceEpoch}',
+        meterNumber: widget.customer?.meterNumber ?? double.parse(DateTime.now().millisecondsSinceEpoch.toString().substring(5)),
         meterImageId: widget.customer?.meterImageId,
         latitude:     _lat,
         longitude:    _lng,

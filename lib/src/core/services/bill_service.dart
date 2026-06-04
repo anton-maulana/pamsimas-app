@@ -36,6 +36,8 @@ class BillService {
     String? status,
     int? billingMonth,
     int? billingYear,
+    String? rt,
+    String? rw,
     int page = 1,
     int itemsPerPage = 100,
   }) async {
@@ -49,6 +51,8 @@ class BillService {
           if (status != null && status != 'Semua') 'status': status.toLowerCase() == 'belum bayar' ? 'unpaid' : status.toLowerCase(),
           if (billingMonth != null) 'billing_month': billingMonth,
           if (billingYear != null) 'billing_year': billingYear,
+          if (rt != null) 'rt': rt,
+          if (rw != null) 'rw': rw,
         },
       );
       final data = response.data?['data'] as List?;

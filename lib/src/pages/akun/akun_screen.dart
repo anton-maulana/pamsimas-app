@@ -1,63 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pamsimas_app/src/core/services/auth_service.dart';
 import 'package:pamsimas_app/src/pages/login/login_screen.dart';
 import 'package:pamsimas_app/src/pages/petugas/petugas_screen.dart';
 
-// ─── Model ────────────────────────────────────────────────────────────────────
-
-enum UserRole { petugas, admin }
-
 class UserProfile {
-  final String   id;
-  final String   nama;
-  final String   telepon;
-  final String   alamat;
-  final String   wilayah;
-  final UserRole role;
+  final int id;
+  final String nama;
+  final String username;
+  final String email;
+  final String telepon;
+  final String alamat;
+  final String wilayah;
+  final String role;
 
   const UserProfile({
     required this.id,
     required this.nama,
+    required this.username,
+    required this.email,
     required this.telepon,
     required this.alamat,
     required this.wilayah,
     required this.role,
   });
 
-  UserProfile copyWith({
-    String?   nama,
-    String?   telepon,
-    String?   alamat,
-    String?   wilayah,
-    UserRole? role,
-  }) {
-    return UserProfile(
-      id:       id,
-      nama:     nama     ?? this.nama,
-      telepon:  telepon  ?? this.telepon,
-      alamat:   alamat   ?? this.alamat,
-      wilayah:  wilayah  ?? this.wilayah,
-      role:     role     ?? this.role,
-    );
-  }
-
-  String get roleLabel    => role == UserRole.admin ? 'Admin' : 'Petugas';
-  String get initials     => nama.trim().split(' ').where((w) => w.isNotEmpty)
+  String get roleLabel => role.toLowerCase() == 'superadmin' ? 'Superadmin' : 'Petugas';
+  String get initials => nama.trim().split(' ').where((w) => w.isNotEmpty)
                                  .take(2).map((w) => w[0].toUpperCase()).join();
 }
-
-// ─── Demo Data ────────────────────────────────────────────────────────────────
-
-const _demoUser = UserProfile(
-  id:      'USR-001',
-  nama:    'Ahmad Fauzi',
-  telepon: '0812-3456-7890',
-  alamat:  'Jl. Melati No. 7, Desa Sumber Makmur',
-  wilayah: 'RT 02 / RW 01',
-  role:    UserRole.admin,
-);
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
 
 class AkunScreen extends StatefulWidget {
   const AkunScreen({Key? key}) : super(key: key);
@@ -70,35 +41,75 @@ class _AkunScreenState extends State<AkunScreen> {
   static const Color primaryBlue = Color(0xFF1565C0);
   static const Color bgGrey      = Color(0xFFF2F4F7);
 
-  UserProfile _user = _demoUser;
+  UserProfile? _user;
+  bool _isLoading = true;
 
-  // ─── Build ─────────────────────────────────────────────────────────────────
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoading = true);
+    final data = await AuthService.instance.getCurrentUserFromServer();
+    if (data != null) {
+      if (mounted) {
+        setState(() {
+          _user = UserProfile(
+            id: data['id'] as int,
+            nama: data['name'] ?? '',
+            username: data['username'] ?? '',
+            email: data['email'] ?? '',
+            telepon: data['phone'] ?? '-',
+            alamat: data['address'] ?? '-',
+            wilayah: '-', 
+            role: data['role'] ?? 'officer',
+          );
+          _isLoading = false;
+        });
+      }
+    } else {
+       if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_user == null) {
+      return const Scaffold(body: Center(child: Text('Gagal memuat profil')));
+    }
+
+    final user = _user!;
+
     return Scaffold(
       backgroundColor: bgGrey,
       appBar: _buildAppBar(),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-        children: [
-          _buildProfileCard(),
-          const SizedBox(height: 20),
-          _buildInfoCard(),
-          const SizedBox(height: 20),
-          _buildMenuCard(),
-          if (_user.role == UserRole.admin) ...[
+      body: RefreshIndicator(
+        onRefresh: _loadProfile,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+          children: [
+            _buildProfileCard(user),
             const SizedBox(height: 20),
-            _buildAdminCard(),
+            _buildInfoCard(user),
+            const SizedBox(height: 20),
+            _buildMenuCard(),
+            if (user.role.toLowerCase() == 'superadmin') ...[
+              const SizedBox(height: 20),
+              _buildAdminCard(),
+            ],
+            const SizedBox(height: 32),
+            _buildLogoutButton(),
           ],
-          const SizedBox(height: 32),
-          _buildLogoutButton(),
-        ],
+        ),
       ),
     );
   }
-
-  // ─── App Bar ───────────────────────────────────────────────────────────────
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -110,20 +121,11 @@ class _AkunScreenState extends State<AkunScreen> {
         'Akun',
         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined),
-          tooltip: 'Notifikasi',
-          onPressed: () => _showSnackBar('Tidak ada notifikasi baru'),
-        ),
-      ],
     );
   }
 
-  // ─── Profile Card ──────────────────────────────────────────────────────────
-
-  Widget _buildProfileCard() {
-    final isAdmin = _user.role == UserRole.admin;
+  Widget _buildProfileCard(UserProfile user) {
+    final isAdmin = user.role.toLowerCase() == 'superadmin';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
@@ -144,7 +146,6 @@ class _AkunScreenState extends State<AkunScreen> {
       ),
       child: Column(
         children: [
-          // Avatar
           Container(
             width: 80,
             height: 80,
@@ -155,7 +156,7 @@ class _AkunScreenState extends State<AkunScreen> {
             ),
             child: Center(
               child: Text(
-                _user.initials,
+                user.initials,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 30,
@@ -165,9 +166,8 @@ class _AkunScreenState extends State<AkunScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          // Name
           Text(
-            _user.nama,
+            user.nama,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -175,7 +175,6 @@ class _AkunScreenState extends State<AkunScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          // Role badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
             decoration: BoxDecoration(
@@ -200,7 +199,7 @@ class _AkunScreenState extends State<AkunScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  _user.roleLabel,
+                  user.roleLabel,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
@@ -210,59 +209,45 @@ class _AkunScreenState extends State<AkunScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 10),
-          // Wilayah
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.location_on_outlined, color: Colors.white.withOpacity(0.80), size: 14),
-              const SizedBox(width: 4),
-              Text(
-                _user.wilayah,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.90),
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  // ─── Info Card ─────────────────────────────────────────────────────────────
-
-  Widget _buildInfoCard() {
+  Widget _buildInfoCard(UserProfile user) {
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader('Informasi Kontak', Icons.contact_page_outlined),
+          _sectionHeader('Informasi Akun', Icons.contact_page_outlined),
           const SizedBox(height: 14),
+          _infoRow(
+            icon: Icons.alternate_email,
+            label: 'Username',
+            value: user.username,
+          ),
+          const _Divider(),
+          _infoRow(
+            icon: Icons.email_outlined,
+            label: 'Email',
+            value: user.email,
+          ),
+          const _Divider(),
           _infoRow(
             icon: Icons.phone_outlined,
             label: 'Nomor Telepon',
-            value: _user.telepon,
+            value: user.telepon,
           ),
           const _Divider(),
           _infoRow(
             icon: Icons.location_on_outlined,
             label: 'Alamat',
-            value: _user.alamat,
-          ),
-          const _Divider(),
-          _infoRow(
-            icon: Icons.map_outlined,
-            label: 'Wilayah',
-            value: _user.wilayah,
+            value: user.alamat,
           ),
         ],
       ),
     );
   }
-
-  // ─── Menu Card ─────────────────────────────────────────────────────────────
 
   Widget _buildMenuCard() {
     return _card(
@@ -272,19 +257,11 @@ class _AkunScreenState extends State<AkunScreen> {
           _sectionHeader('Pengaturan Akun', Icons.settings_outlined),
           const SizedBox(height: 8),
           _menuItem(
-            icon: Icons.edit_outlined,
-            iconColor: const Color(0xFF1565C0),
-            label: 'Edit Profil',
-            subtitle: 'Ubah nama, telepon, dan alamat',
-            onTap: _showEditProfilSheet,
-          ),
-          const _Divider(),
-          _menuItem(
             icon: Icons.lock_outline_rounded,
             iconColor: const Color(0xFF2E7D32),
             label: 'Ganti Password',
             subtitle: 'Perbarui kata sandi akun',
-            onTap: _showGantiPasswordSheet,
+            onTap: () => _showSnackBar('Fitur segera hadir'),
           ),
           const _Divider(),
           _menuItem(
@@ -298,8 +275,6 @@ class _AkunScreenState extends State<AkunScreen> {
       ),
     );
   }
-
-  // ─── Admin Card ────────────────────────────────────────────────────────────
 
   Widget _buildAdminCard() {
     return _card(
@@ -319,20 +294,10 @@ class _AkunScreenState extends State<AkunScreen> {
               MaterialPageRoute(builder: (_) => const PetugasScreen()),
             ),
           ),
-          const _Divider(),
-          _menuItem(
-            icon: Icons.manage_accounts_outlined,
-            iconColor: const Color(0xFF6A1B9A),
-            label: 'Manajemen Pengguna',
-            subtitle: 'Kelola hak akses pengguna',
-            onTap: () => _showSnackBar('Fitur segera hadir'),
-          ),
         ],
       ),
     );
   }
-
-  // ─── Logout Button ─────────────────────────────────────────────────────────
 
   Widget _buildLogoutButton() {
     return SizedBox(
@@ -354,8 +319,6 @@ class _AkunScreenState extends State<AkunScreen> {
       ),
     );
   }
-
-  // ─── Shared Widgets ────────────────────────────────────────────────────────
 
   Widget _card({required Widget child}) {
     return Container(
@@ -488,14 +451,12 @@ class _AkunScreenState extends State<AkunScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFFD1D5DB), size: 22),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF1565C0), size: 22),
           ],
         ),
       ),
     );
   }
-
-  // ─── Actions ───────────────────────────────────────────────────────────────
 
   void _showSnackBar(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -520,17 +481,11 @@ class _AkunScreenState extends State<AkunScreen> {
             child: const Text('Batal', style: TextStyle(color: Color(0xFF6B7280))),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
+            onPressed: () async {
+              await AuthService.instance.logout();
+              if (!mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
-                PageRouteBuilder(
-                  pageBuilder: (_, anim, __) => const LoginScreen(),
-                  transitionsBuilder: (_, anim, __, child) => FadeTransition(
-                    opacity: anim,
-                    child: child,
-                  ),
-                  transitionDuration: const Duration(milliseconds: 400),
-                ),
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
               );
             },
@@ -546,180 +501,6 @@ class _AkunScreenState extends State<AkunScreen> {
     );
   }
 
-  // ─── Edit Profil Sheet ─────────────────────────────────────────────────────
-
-  void _showEditProfilSheet() {
-    final namaCtrl    = TextEditingController(text: _user.nama);
-    final telCtrl     = TextEditingController(text: _user.telepon);
-    final alamatCtrl  = TextEditingController(text: _user.alamat);
-    final wilayahCtrl = TextEditingController(text: _user.wilayah);
-    final formKey     = GlobalKey<FormState>();
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => _SheetScaffold(
-          title: 'Edit Profil',
-          child: Form(
-            key: formKey,
-            child: Column(
-              children: [
-                _SheetField(
-                  ctrl: namaCtrl,
-                  label: 'Nama Lengkap',
-                  icon: Icons.person_outline,
-                  textCap: TextCapitalization.words,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
-                ),
-                const SizedBox(height: 14),
-                _SheetField(
-                  ctrl: telCtrl,
-                  label: 'Nomor Telepon',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[\d\-+]')),
-                    LengthLimitingTextInputFormatter(16),
-                  ],
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Telepon wajib diisi' : null,
-                ),
-                const SizedBox(height: 14),
-                _SheetField(
-                  ctrl: alamatCtrl,
-                  label: 'Alamat',
-                  icon: Icons.location_on_outlined,
-                  maxLines: 3,
-                  textCap: TextCapitalization.sentences,
-                ),
-                const SizedBox(height: 14),
-                _SheetField(
-                  ctrl: wilayahCtrl,
-                  label: 'Wilayah (RT/RW)',
-                  icon: Icons.map_outlined,
-                ),
-                const SizedBox(height: 24),
-                _SheetSaveButton(
-                  label: 'Simpan Perubahan',
-                  onPressed: () {
-                    if (!formKey.currentState!.validate()) return;
-                    setState(() {
-                      _user = _user.copyWith(
-                        nama:    namaCtrl.text.trim(),
-                        telepon: telCtrl.text.trim(),
-                        alamat:  alamatCtrl.text.trim(),
-                        wilayah: wilayahCtrl.text.trim(),
-                      );
-                    });
-                    Navigator.pop(ctx);
-                    _showSnackBar('Profil berhasil diperbarui');
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ).whenComplete(() {
-      namaCtrl.dispose();
-      telCtrl.dispose();
-      alamatCtrl.dispose();
-      wilayahCtrl.dispose();
-    });
-  }
-
-  // ─── Ganti Password Sheet ──────────────────────────────────────────────────
-
-  void _showGantiPasswordSheet() {
-    final oldCtrl  = TextEditingController();
-    final newCtrl  = TextEditingController();
-    final confCtrl = TextEditingController();
-    final formKey  = GlobalKey<FormState>();
-    bool showOld  = false;
-    bool showNew  = false;
-    bool showConf = false;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => _SheetScaffold(
-          title: 'Ganti Password',
-          child: Form(
-            key: formKey,
-            child: Column(
-              children: [
-                _SheetField(
-                  ctrl: oldCtrl,
-                  label: 'Password Lama',
-                  icon: Icons.lock_outline,
-                  obscureText: !showOld,
-                  suffixIcon: IconButton(
-                    icon: Icon(showOld ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                    onPressed: () => setSheetState(() => showOld = !showOld),
-                  ),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Password lama wajib diisi' : null,
-                ),
-                const SizedBox(height: 14),
-                _SheetField(
-                  ctrl: newCtrl,
-                  label: 'Password Baru',
-                  icon: Icons.lock_reset_outlined,
-                  obscureText: !showNew,
-                  suffixIcon: IconButton(
-                    icon: Icon(showNew ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                    onPressed: () => setSheetState(() => showNew = !showNew),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Password baru wajib diisi';
-                    if (v.length < 6) return 'Minimal 6 karakter';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                _SheetField(
-                  ctrl: confCtrl,
-                  label: 'Konfirmasi Password',
-                  icon: Icons.lock_reset_outlined,
-                  obscureText: !showConf,
-                  suffixIcon: IconButton(
-                    icon: Icon(showConf ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                    onPressed: () => setSheetState(() => showConf = !showConf),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Konfirmasi wajib diisi';
-                    if (v != newCtrl.text) return 'Password tidak cocok';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                _SheetSaveButton(
-                  label: 'Simpan Password',
-                  onPressed: () {
-                    if (!formKey.currentState!.validate()) return;
-                    Navigator.pop(ctx);
-                    _showSnackBar('Password berhasil diubah');
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ).whenComplete(() {
-      oldCtrl.dispose();
-      newCtrl.dispose();
-      confCtrl.dispose();
-    });
-  }
-
-  // ─── Sinkronisasi ──────────────────────────────────────────────────────────
-
   void _doSinkronisasi() {
     showDialog<void>(
       context: context,
@@ -734,8 +515,6 @@ class _AkunScreenState extends State<AkunScreen> {
   }
 }
 
-// ─── Private Helpers ──────────────────────────────────────────────────────────
-
 class _Divider extends StatelessWidget {
   const _Divider();
   @override
@@ -744,176 +523,15 @@ class _Divider extends StatelessWidget {
   }
 }
 
-// ─── Bottom Sheet Scaffold ────────────────────────────────────────────────────
-
-class _SheetScaffold extends StatelessWidget {
-  const _SheetScaffold({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A2E),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-              child: child,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Sheet Text Field ─────────────────────────────────────────────────────────
-
-class _SheetField extends StatelessWidget {
-  const _SheetField({
-    required this.ctrl,
-    required this.label,
-    required this.icon,
-    this.keyboardType,
-    this.inputFormatters,
-    this.textCap = TextCapitalization.none,
-    this.maxLines = 1,
-    this.obscureText = false,
-    this.suffixIcon,
-    this.validator,
-  });
-
-  final TextEditingController        ctrl;
-  final String                       label;
-  final IconData                     icon;
-  final TextInputType?               keyboardType;
-  final List<TextInputFormatter>?    inputFormatters;
-  final TextCapitalization           textCap;
-  final int                          maxLines;
-  final bool                         obscureText;
-  final Widget?                      suffixIcon;
-  final FormFieldValidator<String>?  validator;
-
-  static const Color _blue = Color(0xFF1565C0);
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller:          ctrl,
-      keyboardType:        keyboardType,
-      inputFormatters:     inputFormatters,
-      textCapitalization:  textCap,
-      maxLines:            obscureText ? 1 : maxLines,
-      obscureText:         obscureText,
-      validator:           validator,
-      decoration: InputDecoration(
-        labelText:  label,
-        labelStyle: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
-        floatingLabelStyle: const TextStyle(color: _blue, fontSize: 13),
-        prefixIcon: Icon(icon, color: const Color(0xFF9CA3AF), size: 20),
-        suffixIcon: suffixIcon,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        filled:     true,
-        fillColor:  const Color(0xFFF9FAFB),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _blue, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFC62828), width: 1.5),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFC62828), width: 1.5),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Sheet Save Button ────────────────────────────────────────────────────────
-
-class _SheetSaveButton extends StatelessWidget {
-  const _SheetSaveButton({required this.label, required this.onPressed});
-
-  final String        label;
-  final VoidCallback  onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF1565C0),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Sinkronisasi Dialog ──────────────────────────────────────────────────────
-
 class _SinkronisasiDialog extends StatefulWidget {
   const _SinkronisasiDialog({required this.onComplete});
-
   final VoidCallback onComplete;
-
   @override
   State<_SinkronisasiDialog> createState() => _SinkronisasiDialogState();
 }
 
 class _SinkronisasiDialogState extends State<_SinkronisasiDialog> {
   static const Color primaryBlue = Color(0xFF1565C0);
-
   String _status = 'Menyambungkan ke server...';
   double _progress = 0;
   bool   _done     = false;
@@ -955,51 +573,22 @@ class _SinkronisasiDialogState extends State<_SinkronisasiDialog> {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: primaryBlue.withOpacity(0.10),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: primaryBlue.withOpacity(0.10), shape: BoxShape.circle),
               child: _done
                   ? const Icon(Icons.check_circle_outline, color: Color(0xFF2E7D32), size: 36)
-                  : const SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        color: primaryBlue,
-                      ),
-                    ),
+                  : const SizedBox(width: 36, height: 36, child: CircularProgressIndicator(strokeWidth: 3, color: primaryBlue)),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Sinkronisasi Data',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-            ),
+            const Text('Sinkronisasi Data', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(
-              _status,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-              textAlign: TextAlign.center,
-            ),
+            Text(_status, style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)), textAlign: TextAlign.center),
             const SizedBox(height: 20),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: _progress,
-                minHeight: 8,
-                backgroundColor: const Color(0xFFE5E7EB),
-                color: primaryBlue,
-              ),
+              child: LinearProgressIndicator(value: _progress, minHeight: 8, backgroundColor: const Color(0xFFE5E7EB), color: primaryBlue),
             ),
             const SizedBox(height: 10),
-            Text(
-              '${(_progress * 100).toInt()}%',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: primaryBlue,
-              ),
-            ),
+            Text('${(_progress * 100).toInt()}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: primaryBlue)),
           ],
         ),
       ),

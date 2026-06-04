@@ -23,10 +23,18 @@ class _TagihanScreenState extends State<TagihanScreen> {
 
   late DateTime _selectedMonth;
   String _filterStatus = 'Semua';
-  String _filterRt     = 'Semua';
+  List<String> _selectedRts = [];
+  List<String> _selectedRws = [];
 
   final List<String> _statusOptions = ['Semua', 'Lunas', 'Belum Bayar', 'Sebagian'];
-  final List<String> _rtOptions     = ['Semua', 'RT 01', 'RT 02', 'RT 03', 'RT 04'];
+  final List<String> _rtOptions = [
+    'Semua',
+    ...List.generate(12, (i) => 'RT ${(i + 1).toString().padLeft(2, '0')}')
+  ];
+  final List<String> _rwOptions = [
+    'Semua',
+    ...List.generate(12, (i) => 'RW ${(i + 1).toString().padLeft(2, '0')}')
+  ];
 
   final List<DateTime> _monthOptions = List.generate(12, (i) {
     final now = DateTime.now();
@@ -99,7 +107,6 @@ class _TagihanScreenState extends State<TagihanScreen> {
           _bills = [];
           _hasMore = true;
        });
-       // Fetch summary stats only on reset/init
        _fetchSummary();
      } else {
        setState(() {
@@ -117,10 +124,15 @@ class _TagihanScreenState extends State<TagihanScreen> {
           statusFilter = 'partially_paid';
         }
 
+        final rtParam = _selectedRts.map((s) => s.replaceFirst('RT ', '')).join(',');
+        final rwParam = _selectedRws.map((s) => s.replaceFirst('RW ', '')).join(',');
+
         final fetchedBills = await BillService.instance.list(
            billingMonth: _selectedMonth.month,
            billingYear: _selectedMonth.year,
            status: statusFilter,
+           rt: rtParam.isEmpty ? null : rtParam,
+           rw: rwParam.isEmpty ? null : rwParam,
            page: _currentPage,
            itemsPerPage: _pageSize,
         );
@@ -181,14 +193,7 @@ class _TagihanScreenState extends State<TagihanScreen> {
   }
 
   List<BillRead> get _filtered {
-    // Local filtering for RT
-    return _bills.where((b) {
-      final cust = _customerCache[b.customerId];
-      if (cust == null) return false;
-      
-      final matchRt = _filterRt == 'Semua' || cust.rt == _filterRt.replaceFirst('RT ', '');
-      return matchRt;
-    }).toList();
+    return _bills;
   }
 
   String _formatRp(int value) {
@@ -381,16 +386,23 @@ class _TagihanScreenState extends State<TagihanScreen> {
           ),
           const SizedBox(width: 8),
           _buildChip(
-            label: _filterRt == 'Semua' ? 'RT' : _filterRt,
-            active: _filterRt != 'Semua',
+            label: _selectedRts.isEmpty ? 'RT' : '${_selectedRts.length} RT',
+            active: _selectedRts.isNotEmpty,
+            onTap: () => _showFilterSheet(),
+          ),
+          const SizedBox(width: 8),
+          _buildChip(
+            label: _selectedRws.isEmpty ? 'RW' : '${_selectedRws.length} RW',
+            active: _selectedRws.isNotEmpty,
             onTap: () => _showFilterSheet(),
           ),
           const Spacer(),
-          if (_filterStatus != 'Semua' || _filterRt != 'Semua')
+          if (_filterStatus != 'Semua' || _selectedRts.isNotEmpty || _selectedRws.isNotEmpty)
             GestureDetector(
               onTap: () => setState(() {
                 _filterStatus = 'Semua';
-                _filterRt     = 'Semua';
+                _selectedRts  = [];
+                _selectedRws  = [];
                 _fetchBills(reset: true);
               }),
               child: const Text('Reset',
@@ -655,88 +667,129 @@ class _TagihanScreenState extends State<TagihanScreen> {
   void _showFilterSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) {
         return StatefulBuilder(
           builder: (ctx, setSheet) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFD1D5DB),
-                          borderRadius: BorderRadius.circular(2)),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Status Pembayaran',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    children: _statusOptions.map((opt) {
-                      final active = _filterStatus == opt;
-                      return GestureDetector(
-                        onTap: () {
-                          setSheet(() {});
-                          setState(() {
-                             _filterStatus = opt;
-                          });
-                        },
-                        child: _filterPill(opt, active),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('RT',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _rtOptions.map((opt) {
-                      final active = _filterRt == opt;
-                      return GestureDetector(
-                        onTap: () {
-                          setSheet(() {});
-                          setState(() {
-                             _filterRt = opt;
-                          });
-                        },
-                        child: _filterPill(opt, active),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                         Navigator.pop(context);
-                         _fetchBills();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryBlue,
-                        foregroundColor: Colors.white,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.8,
+              ),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 32),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFD1D5DB),
+                            borderRadius: BorderRadius.circular(2)),
                       ),
-                      child: const Text('Terapkan',
-                          style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    const Text('Status Pembayaran',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      children: _statusOptions.map((opt) {
+                        final active = _filterStatus == opt;
+                        return GestureDetector(
+                          onTap: () {
+                            setSheet(() {});
+                            setState(() {
+                               _filterStatus = opt;
+                            });
+                          },
+                          child: _filterPill(opt, active),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('RT',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _rtOptions.map((opt) {
+                        final active = opt == 'Semua' ? _selectedRts.isEmpty : _selectedRts.contains(opt);
+                        return GestureDetector(
+                          onTap: () {
+                            setSheet(() {
+                              if (opt == 'Semua') {
+                                _selectedRts.clear();
+                              } else {
+                                if (_selectedRts.contains(opt)) {
+                                  _selectedRts.remove(opt);
+                                } else {
+                                  _selectedRts.add(opt);
+                                }
+                              }
+                            });
+                          },
+                          child: _filterPill(opt, active),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('RW',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _rwOptions.map((opt) {
+                        final active = opt == 'Semua' ? _selectedRws.isEmpty : _selectedRws.contains(opt);
+                        return GestureDetector(
+                          onTap: () {
+                            setSheet(() {
+                              if (opt == 'Semua') {
+                                _selectedRws.clear();
+                              } else {
+                                if (_selectedRws.contains(opt)) {
+                                  _selectedRws.remove(opt);
+                                } else {
+                                  _selectedRws.add(opt);
+                                }
+                              }
+                            });
+                          },
+                          child: _filterPill(opt, active),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                           Navigator.pop(context);
+                           _fetchBills();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryBlue,
+                          foregroundColor: Colors.white,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Terapkan',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -766,8 +819,8 @@ class _TagihanScreenState extends State<TagihanScreen> {
     final tagihanItem = TagihanItem(
        id: bill.id.toString(),
        nama: customer.name,
-       rt: customer.rt,
-       rw: customer.rw,
+       rt: customer.rt.toString(),
+       rw: customer.rw.toString(),
        alamat: customer.address,
        meterSebelumnya: bill.meterStart,
        meterSaatIni: bill.meterEnd,

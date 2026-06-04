@@ -199,15 +199,19 @@ class _TambahPetugasScreenState extends State<TambahPetugasScreen> {
             TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Batal', style: TextStyle(color: Colors.grey))),
-            ElevatedButton(
+              ElevatedButton(
               onPressed: () {
                 if (selectedRt != null && selectedRw != null) {
                   setState(() {
-                    _areas.add(OfficerArea(rt: selectedRt!, rw: selectedRw!));
+                    _areas.add(OfficerArea(
+                      rt: int.parse(selectedRt!),
+                      rw: int.parse(selectedRw!),
+                    ));
                   });
                   Navigator.pop(ctx);
                 }
               },
+
               style: ElevatedButton.styleFrom(
                   backgroundColor: primaryBlue, foregroundColor: Colors.white),
               child: const Text('Tambah'),

@@ -24,25 +24,54 @@ class _SplashScreenPageState extends State<SplashScreenPage> {
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    // Tunggu selama 3 detik dan cek status login secara paralel
-    final results = await Future.wait([
-      Future.delayed(const Duration(seconds: 3)),
-      AuthService.instance.isLoggedIn(),
-    ]);
-
-    final bool isLoggedIn = results[1] as bool;
+    // 1. Cek status login
+    final bool isLoggedIn = await AuthService.instance.isLoggedIn();
 
     if (!mounted) return;
 
     if (isLoggedIn) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
-      );
+      try {
+        // 2. Pre-load data krusial secara paralel
+        await Future.wait([
+          Future.delayed(const Duration(seconds: 2)), // Minimal splash time
+          AuthService.instance.getAccessToken(),      // Refresh token & local info
+          AuthService.instance.getCurrentUserFromServer(), // Fetch full profile from API
+        ]);
+
+        if (!mounted) return;
+        // 3. Pindah ke MainNavigation setelah data SIAP
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const MainNavigation()),
+        );
+      } catch (e) {
+        print('[SplashScreen] Error loading data: $e');
+        if (!mounted) return;
+        _showErrorAndRetry();
+      }
     } else {
+      // Jika tidak login, langsung ke Login setelah delay minimal
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const LoginScreen()),
       );
     }
+  }
+
+  void _showErrorAndRetry() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Gagal memuat data. Periksa koneksi internet.'),
+        action: SnackBarAction(
+          label: 'Coba Lagi',
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            _checkAuthAndNavigate();
+          },
+        ),
+        duration: const Duration(days: 1),
+      ),
+    );
   }
 
   @override

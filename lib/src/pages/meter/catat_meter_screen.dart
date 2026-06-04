@@ -37,7 +37,7 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
   final _picker        = ImagePicker();
 
   Customer? _selected;
-  int?    _meterSaatIni;
+  double?    _meterSaatIni;
   File?   _buktiPhoto;
   double? _lat;
   double? _lng;
@@ -57,7 +57,7 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
     if (widget.preselectedCustomer != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // Refresh officers for this customer's area
-      _fetchOfficers(rt: widget.preselectedCustomer!.rt, rw: widget.preselectedCustomer!.rw);
+      _fetchOfficers(rt: widget.preselectedCustomer!.rt.toString(), rw: widget.preselectedCustomer!.rw.toString());
       _selectCustomerDirectly(widget.preselectedCustomer!);
       });
     } else {
@@ -75,9 +75,10 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
        _isLoadingUnpaidBills = true;
        _amountDirectCtrl.text = _estimasiTagihan.toString();
      });
-
+ 
      // Refresh officers for this customer's area
-     _fetchOfficers(rt: picked.rt, rw: picked.rw);
+     _fetchOfficers(rt: picked.rt.toString(), rw: picked.rw.toString());
+
 
      try {
         final customerId = int.parse(picked.id);
@@ -164,17 +165,17 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
 
 
   // ─── Computed ──────────────────────────────────────────────────────────────
-  int get _pemakaian {
+  double get _pemakaian {
     if (_selected == null || _meterSaatIni == null) return 0;
-    final previous = int.tryParse(_selected!.meterNumber) ?? 0;
+    final previous = _selected!.meterNumber;
     final diff = _meterSaatIni! - previous;
     return diff < 0 ? 0 : diff;
   }
 
-  int get _estimasiTagihan => _pemakaian * _tarifPerM3;
+  double get _estimasiTagihan => _pemakaian * _tarifPerM3;
 
-  String _formatRp(int value) {
-    final s = value.toString();
+  String _formatRp(num value) {
+    final s = value.toInt().toString();
     final buffer = StringBuffer();
     for (int i = 0; i < s.length; i++) {
       if (i > 0 && (s.length - i) % 3 == 0) buffer.write('.');
@@ -188,7 +189,7 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
   final _amountDirectCtrl = TextEditingController();
 
   void _onMeterChanged(String v) {
-    setState(() => _meterSaatIni = int.tryParse(v));
+    setState(() => _meterSaatIni = double.tryParse(v));
     _amountDirectCtrl.text = (_estimasiTagihan + _totalTunggakan).toInt().toString();
   }
 
@@ -265,7 +266,7 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
            final today = DateTime.now();
            final readingDateStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
 
-           final previousMeter = int.tryParse(_selected!.meterNumber) ?? 0;
+           final previousMeter = _selected!.meterNumber;
 
            final req = MeterReadingRequest(
               customerId: int.parse(_selected!.id),
@@ -287,7 +288,7 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
              meterStart: previousMeter,
              meterEnd: _meterSaatIni!,
              usage: _pemakaian,
-             amount: _estimasiTagihan.toDouble(),
+             amount: _estimasiTagihan,
              status: 'unpaid', 
            ));
            
@@ -729,8 +730,8 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
     return _card(
       child: TextFormField(
         controller: _meterCtrl,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
         style: const TextStyle(
             fontSize: 22, fontWeight: FontWeight.bold, color: AppPalette.textDark),
         onChanged: _onMeterChanged,
@@ -780,9 +781,9 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
         ),
         validator: (v) {
           if (v == null || v.isEmpty) return 'Wajib diisi';
-          final val = int.tryParse(v);
+          final val = double.tryParse(v);
           if (val == null) return 'Angka tidak valid';
-            if (_selected != null && val < (int.tryParse(_selected!.meterNumber) ?? 0)) {
+            if (_selected != null && val < _selected!.meterNumber) {
               return 'Tidak boleh kurang dari meter sebelumnya (${_selected!.meterNumber})';
             }
           return null;
@@ -799,7 +800,7 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
           child: _buildCalcCard(
             icon: Icons.water_drop_outlined,
             label: 'Pemakaian',
-            value: '$_pemakaian m³',
+            value: '${_pemakaian.toStringAsFixed(2)} m³',
             color: AppPalette.teal,
           ),
         ),
@@ -1185,7 +1186,7 @@ class _CatatMeterScreenState extends State<CatatMeterScreen> {
         });
 
         // Refresh officers for this customer's area
-        _fetchOfficers(rt: picked.rt, rw: picked.rw);
+        _fetchOfficers(rt: picked.rt.toString(), rw: picked.rw.toString());
 
         try {
            final customerId = int.parse(picked.id);

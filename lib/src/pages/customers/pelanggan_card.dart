@@ -114,7 +114,7 @@ class PelangganCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      customer.meterNumber,
+                      'Meter ID: ${customer.meterNumber}',
                       style: const TextStyle(fontSize: 11, color: AppPalette.textHint),
                     ),
                   ],

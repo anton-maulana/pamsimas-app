@@ -3,11 +3,11 @@
 class Customer {
   final String id;
   final String name;
-  final String rt;
-  final String rw;
+  final int rt;
+  final int rw;
   final String address;
   final String phoneNumber;
-  final String meterNumber;
+  final double meterNumber;
   final int? meterImageId;
   final int? officerId;
   final String status;
@@ -32,11 +32,11 @@ class Customer {
   factory Customer.fromJson(Map<String, dynamic> json) => Customer(
         id: json['id'].toString(),
         name: json['name'] as String,
-        rt: json['rt'] as String,
-        rw: json['rw'] as String,
+        rt: json['rt'] as int,
+        rw: json['rw'] as int,
         address: json['address'] as String,
         phoneNumber: json['phoneNumber'] as String,
-        meterNumber: json['meterNumber'] as String,
+        meterNumber: (json['meterNumber'] as num).toDouble(),
         meterImageId: json['meterImageId'] as int?,
         officerId: json['officerId'] as int?,
         status: json['status'] as String,
@@ -49,11 +49,11 @@ class Customer {
 
 class CustomerRequest {
   final String name;
-  final String rt;
-  final String rw;
+  final int rt;
+  final int rw;
   final String address;
   final String phoneNumber;
-  final String meterNumber;
+  final double meterNumber;
   final int? meterImageId;
   final int? officerId;
   final String status;
