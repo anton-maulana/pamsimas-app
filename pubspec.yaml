@@ -13,7 +13,7 @@ dependencies:
   flutter_svg: ^2.0.10
   dio: ^5.8.0+1
   flutter_secure_storage: ^9.2.4
-  flutter_form_builder: ^10.2.0
+  flutter_form_builder: ^11.0.0
   form_builder_validators: ^11.1.2
   flutter_dotenv: ^5.0.2
   jwt_decoder: ^2.0.1
